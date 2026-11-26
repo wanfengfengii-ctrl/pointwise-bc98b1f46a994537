@@ -41,6 +41,8 @@ class Timeline:
         key = (station, operation, phase, payload.get('request'))
         with self.lock:
             cut = self.armed.pop(key, None)
+            if cut is None and key[3] is not None:
+                cut = self.armed.pop((station, operation, phase, None), None)
         if cut is None:
             return
         cut.result = result

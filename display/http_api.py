@@ -71,6 +71,12 @@ def make_terminal_handler(ledger, terminals, hook=None):
         return show_cue(ledger, terminals, payload,
                         before_commit=lambda: notify('show', 'before_commit', payload))
 
+    def finish(payload):
+        return ledger.stop_session(
+            payload['session'], payload['terminal'], payload['request'],
+            before_commit=lambda: notify('finish', 'before_commit', payload),
+        )
+
     def receipt(payload, key):
         original = lookup_receipt(ledger, payload['session'], payload['terminal'], **{key: payload[key]})
         return {'receipt': original.to_payload() if original is not None else None}
@@ -79,6 +85,7 @@ def make_terminal_handler(ledger, terminals, hook=None):
         'preload': route('preload', IDENTITY_FIELDS + ('station', 'text'),
                          lambda payload: store_preload(ledger, payload)),
         'show': route('show', IDENTITY_FIELDS, show),
+        'finish': route('finish', ('session', 'terminal', 'request'), finish),
         'apply_amendment': route('apply_amendment', (
             'session', 'request', 'target', 'predecessor', 'target_terminal', 'target_station',
             'predecessor_terminal', 'predecessor_station',

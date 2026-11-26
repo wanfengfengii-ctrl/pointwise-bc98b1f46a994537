@@ -22,6 +22,7 @@ from order.request import submit_amendment
 from order.store import AmendmentStore
 from review.archive import ExcerptArchive
 from review.close import close_session
+from review.finish import FinishStore, finish_session
 from review.lookup import lookup_record
 from script.catalog import EditionCatalog
 from script.release import release_edition
@@ -55,13 +56,15 @@ class CoordinatorStores:
     amendments: AmendmentStore
     directory: PreloadDirectory
     archive: ExcerptArchive
+    finishes: FinishStore
 
     @classmethod
     def open(cls, root):
         root.mkdir(parents=True, exist_ok=True)
         path = root / 'coordinator.sqlite3'
+        archive = ExcerptArchive(path)
         return cls(EditionCatalog(path), SessionStore(path), AmendmentStore(path),
-                   PreloadDirectory(path), ExcerptArchive(path))
+                   PreloadDirectory(path), archive, FinishStore(path))
 
 
 def initialize_databases(config):
@@ -88,6 +91,10 @@ def coordinator_handler(stores, terminals):
     def close(session):
         return close_session(stores.archive, terminals, *context(session))
 
+    def finish(session, request):
+        record, edition = context(session)
+        return finish_session(stores.finishes, stores.archive, terminals, record, edition, request)
+
     operations = {
         'release': partial(release_edition, stores.catalog),
         'open': endpoint('edition bindings', partial(open_session, stores.catalog, stores.sessions)),
@@ -96,6 +103,7 @@ def coordinator_handler(stores, terminals):
         'amend': endpoint('session target predecessor request', amend),
         'show': endpoint('session terminal cue request', partial(forward_show, stores.directory, terminals)),
         'close': endpoint('session', close),
+        'finish': endpoint('session request', finish),
         'lookup': endpoint('session kind id', partial(lookup_record, stores.amendments,
                                                       stores.directory, stores.archive, terminals)),
     }
@@ -162,17 +170,29 @@ def demo():
                 if api('/show', actions[cue])['status'] != 'shown':
                     raise RuntimeError(f'提示未实际亮出 {cue}')
             excerpt = api('/close', {'session': session})
+            finish_request = {'session': session, 'request': 'FS1'}
+            finished = api('/finish', finish_request)
         with local_rehearsal(root) as (address, _):
             restored = json_request(address, '/lookup', {'session': session, 'kind': 'excerpt',
                                                          'id': excerpt['excerpt']})
+            replayed_finish = json_request(address, '/finish', finish_request)
+    expected_finish = {
+        'status': 'finished',
+        'excerpt': dict(expected, excerpt='X2', last_sequences={'left': 2, 'right': 2}),
+    }
     if excerpt != expected or restored != expected:
         raise RuntimeError('实际摘录或重开复领与样例台账不符')
+    if finished != expected_finish or replayed_finish != expected_finish:
+        raise RuntimeError('最终摘录或散场原号续领与样例台账不符')
     print('POINTWISE_SCENARIO ' + encode({
         'case_id': 'v7', 'input': {'readthrough': sample, 'shown': ['A0', 'B0', 'A1', 'B1']},
         'expected': expected, 'actual': excerpt, 'downstream_expected': expected,
-        'downstream_actual': restored, 'code_paths': ['display/ledger.py', 'review/reconcile.py',
-                                                      'review/coverage.py', 'review/archive.py'],
-        'oracle': '逐端按发出顺序手编端内序号，再以正式角色单逐项勾去四条已亮提示。',
+        'downstream_actual': restored,
+        'finish_expected': expected_finish, 'finish_actual': finished,
+        'finish_replay_after_restart': replayed_finish,
+        'code_paths': ['display/ledger.py', 'review/reconcile.py',
+                      'review/coverage.py', 'review/archive.py', 'review/finish.py'],
+        'oracle': '逐端按发出顺序手编端内序号，再以正式角色单逐项勾去四条已亮提示；散场另记各台本场末序。',
     }))
 
 

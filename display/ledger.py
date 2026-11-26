@@ -29,6 +29,11 @@ class TerminalLedger:
                     session TEXT NOT NULL, cue TEXT NOT NULL,
                     request TEXT NOT NULL REFERENCES amendment_decisions(request), PRIMARY KEY(session, cue)
                 );
+                CREATE TABLE IF NOT EXISTS session_stops (
+                    session TEXT PRIMARY KEY,
+                    terminal TEXT NOT NULL,
+                    request TEXT NOT NULL
+                );
             ''')
 
     def _receipt(self, row):
@@ -105,6 +110,9 @@ class TerminalLedger:
                 if prior['request'] != request:
                     raise Problem(409, 'cue_already_shown')
                 return self._receipt(prior)
+            stopped = db.execute('SELECT 1 FROM session_stops WHERE session = ?', (session,)).fetchone()
+            if stopped is not None:
+                raise Problem(409, 'session_finished')
             # The network read precedes this transaction. Compare its immutable proof
             # with the rule in effect at the actual first-write boundary.
             rule = self._read_rule(db, session, cue)
@@ -116,6 +124,21 @@ class TerminalLedger:
             db.execute("UPDATE preloads SET state = 'shown' WHERE request = ?", (request,))
             row = db.execute('SELECT * FROM appearances WHERE sequence = ?', (number,)).fetchone()
             return self._receipt(row)
+
+    def stop_session(self, session, terminal, request, before_commit=None):
+        if before_commit is not None:
+            before_commit()
+        with database(self.path, write=True) as db:
+            existing = db.execute('SELECT * FROM session_stops WHERE session = ?', (session,)).fetchone()
+            if existing is None:
+                db.execute('INSERT INTO session_stops(session, terminal, request) VALUES (?, ?, ?)',
+                           (session, terminal, request))
+                original_request = request
+            else:
+                terminal = existing['terminal']
+                original_request = existing['request']
+        return {'status': 'finished', 'session': session, 'terminal': terminal,
+                'station': self.station, 'request': original_request, 'finished': True}
 
     def find_appearance(self, session, *, request=None, cue=None):
         if (request is None) == (cue is None):
