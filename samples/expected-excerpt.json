@@ -1,0 +1,27 @@
+{
+  "session": "S1",
+  "edition": "V1",
+  "excerpt": "X1",
+  "roles": [
+    {
+      "role": "甲",
+      "terminal": "left",
+      "station": "left",
+      "shown": [
+        {"session": "S1", "terminal": "left", "station": "left", "cue": "A0", "request": "PA0", "sequence": 1, "text": "门开了"},
+        {"session": "S1", "terminal": "left", "station": "left", "cue": "A1", "request": "PA", "sequence": 2, "text": "门开了"}
+      ],
+      "missed": ["A2"]
+    },
+    {
+      "role": "乙",
+      "terminal": "right",
+      "station": "right",
+      "shown": [
+        {"session": "S1", "terminal": "right", "station": "right", "cue": "B0", "request": "PB0", "sequence": 1, "text": "我在"},
+        {"session": "S1", "terminal": "right", "station": "right", "cue": "B1", "request": "PB", "sequence": 2, "text": "那就进来"}
+      ],
+      "missed": ["B2"]
+    }
+  ]
+}

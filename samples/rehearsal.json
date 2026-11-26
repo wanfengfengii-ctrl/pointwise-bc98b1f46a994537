@@ -1,0 +1,18 @@
+{
+  "release": {
+    "script": "R1",
+    "roles": ["甲", "乙"],
+    "cues": [
+      {"position": 10, "cue": "A1", "role": "甲", "text": "门开了"},
+      {"position": 20, "cue": "B0", "role": "乙", "text": "我在"},
+      {"position": 30, "cue": "A0", "role": "甲", "text": "门开了"},
+      {"position": 40, "cue": "B1", "role": "乙", "text": "那就进来"},
+      {"position": 50, "cue": "A2", "role": "甲", "text": "请坐"},
+      {"position": 60, "cue": "B2", "role": "乙", "text": "好"}
+    ]
+  },
+  "bindings": [
+    {"terminal": "left", "role": "甲"},
+    {"terminal": "right", "role": "乙"}
+  ]
+}
